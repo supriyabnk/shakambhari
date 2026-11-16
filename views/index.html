@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Parts Portal</title>
+<style>
+  :root { --bg:#f3f4f2; --ink:#1d2321; --mute:#66706c; --line:#d5d9d6; --accent:#0b6b5c; --warn:#a3411c; --panel:#fff; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#161a19; --ink:#e8ece9; --mute:#93a09a; --line:#2c3331; --accent:#4cc2ac; --warn:#e58a63; --panel:#1e2423; }
+  }
+  * { box-sizing:border-box; }
+  html,body { height:100%; margin:0; }
+  body { font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; background:var(--bg); color:var(--ink); display:flex; flex-direction:column; }
+  header { display:flex; gap:12px; align-items:center; padding:10px 14px; border-bottom:1px solid var(--line); background:var(--panel); flex-wrap:wrap; }
+  header strong { font-size:16px; margin-right:6px; }
+  input { font:inherit; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--ink); }
+  input:focus-visible, button:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  button { font:inherit; padding:8px 12px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--ink); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  button[aria-pressed="true"] { border-color:var(--accent); box-shadow:inset 0 -2px 0 var(--accent); }
+  main { flex:1; display:grid; grid-template-columns:1fr 320px; min-height:0; }
+  iframe { width:100%; height:100%; border:0; background:#fff; }
+  aside { border-left:1px solid var(--line); background:var(--panel); padding:14px; overflow:auto; display:flex; flex-direction:column; gap:10px; }
+  aside h2 { margin:8px 0 0; font-size:14px; }
+  .row { display:flex; gap:8px; }
+  .row input { flex:1; min-width:0; }
+  .hint { color:var(--mute); font-size:13px; margin:0; }
+  .stock { border:1px solid var(--line); border-radius:6px; padding:10px; }
+  .in { color:var(--accent); font-weight:600; } .out { color:var(--warn); font-weight:600; }
+  @media (max-width:800px) { main { grid-template-columns:1fr; grid-template-rows:60% 40%; } aside { border-left:0; border-top:1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header>
+  <strong>Parts Portal</strong>
+  <input id="chassis" placeholder="Chassis / VIN number" size="26" aria-label="Chassis number">
+  <button class="primary" id="goChassis">Find parts</button>
+  <button id="tabPs" aria-pressed="true">PartSouq</button>
+  <button id="tabBm" aria-pressed="false">Boodmo</button>
+</header>
+<main>
+  <iframe id="view" title="Site view" src="/ps/"></iframe>
+  <aside>
+    <h2>Part number</h2>
+    <div class="row">
+      <input id="part" placeholder="e.g. 04465-02220" aria-label="Part number">
+    </div>
+    <button id="grab">Use text selected in the page</button>
+    <p class="hint">Select the part number on the PartSouq page, then press the button above.</p>
+    <button class="primary" id="goBoodmo">Check price on Boodmo</button>
+    <button id="goStock">Check my stock</button>
+    <div id="stock" aria-live="polite"></div>
+  </aside>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const view = $('view');
+let urls = { chassis:'/ps/en/search/all?q={q}', boodmoPart:'/bm/search/?q={q}' };
+fetch('/api/config').then(r => r.json()).then(u => urls = u);
+
+function tab(which) {
+  $('tabPs').setAttribute('aria-pressed', which === 'ps');
+  $('tabBm').setAttribute('aria-pressed', which === 'bm');
+}
+$('tabPs').onclick = () => { view.src = '/ps/'; tab('ps'); };
+$('tabBm').onclick = () => { view.src = '/bm/'; tab('bm'); };
+
+$('goChassis').onclick = () => {
+  const q = $('chassis').value.trim(); if (!q) return;
+  view.src = urls.chassis.replace('{q}', encodeURIComponent(q)); tab('ps');
+};
+$('chassis').addEventListener('keydown', e => e.key === 'Enter' && $('goChassis').click());
+
+$('grab').onclick = () => {
+  try {
+    const t = view.contentWindow.getSelection().toString().trim();
+    if (t) $('part').value = t; else $('stock').innerHTML = '<p class="hint">Nothing selected in the page.</p>';
+  } catch { $('stock').innerHTML = '<p class="hint">Cannot read the page. Paste the part number instead.</p>'; }
+};
+
+$('goBoodmo').onclick = () => {
+  const q = $('part').value.trim(); if (!q) return;
+  view.src = urls.boodmoPart.replace('{q}', encodeURIComponent(q)); tab('bm');
+};
+
+async function checkStock() {
+  const q = $('part').value.trim(); if (!q) return;
+  const r = await fetch('/api/stock?part=' + encodeURIComponent(q));
+  const d = await r.json(); const box = $('stock');
+  if (d.error) { box.innerHTML = `<p class="out">${d.error}</p>`; return; }
+  if (!d.found) { box.innerHTML = '<p class="out">Not in your stock file.</p>'; return; }
+  box.innerHTML = d.items.map(i => `<div class="stock"><b>${i.name}</b><br>${i.part_number}<br>
+    <span class="${i.qty > 0 ? 'in' : 'out'}">${i.qty > 0 ? i.qty + ' in stock' : 'Out of stock'}</span>
+    · Rs ${i.price} · ${i.location}</div>`).join('');
+}
+$('goStock').onclick = checkStock;
+$('part').addEventListener('keydown', e => e.key === 'Enter' && checkStock());
+</script>
+</body>
+</html>
