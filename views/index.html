@@ -57,7 +57,7 @@
 const $ = id => document.getElementById(id);
 const view = $('view');
 let urls = { chassis:'/ps/en/search/all?q={q}', boodmoPart:'/bm/search/?q={q}' };
-fetch('/api/config').then(r => r.json()).then(u => urls = u);
+fetch('/portal/config').then(r => r.json()).then(u => urls = u);
 
 function tab(which) {
   $('tabPs').setAttribute('aria-pressed', which === 'ps');
@@ -86,7 +86,7 @@ $('goBoodmo').onclick = () => {
 
 async function checkStock() {
   const q = $('part').value.trim(); if (!q) return;
-  const r = await fetch('/api/stock?part=' + encodeURIComponent(q));
+  const r = await fetch('/portal/stock?part=' + encodeURIComponent(q));
   const d = await r.json(); const box = $('stock');
   if (d.error) { box.innerHTML = `<p class="out">${d.error}</p>`; return; }
   if (!d.found) { box.innerHTML = '<p class="out">Not in your stock file.</p>'; return; }

@@ -60,7 +60,7 @@ for (const [prefix, s] of Object.entries(cfg.sites)) mountSite(prefix, s.target)
 
 // ---- Stock lookup from stock.csv (part_number,name,qty,price,location) ----
 const norm = s => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-app.get('/api/stock', (req, res) => {
+app.get('/portal/stock', (req, res) => {
   const q = norm(req.query.part);
   if (!q) return res.json({ found: false, items: [] });
   let rows = [];
@@ -72,8 +72,8 @@ app.get('/api/stock', (req, res) => {
   res.json({ found: items.length > 0, items });
 });
 
-// ---- Diagnostics: /api/debug?site=ps&path=/ shows what the other site returns to your server ----
-app.get('/api/debug', async (req, res) => {
+// ---- Diagnostics: /portal/debug?site=ps&path=/ shows what the other site returns to your server ----
+app.get('/portal/debug', async (req, res) => {
   const s = cfg.sites[req.query.site];
   if (!s) return res.status(400).json({ error: 'site must be one of: ' + Object.keys(cfg.sites).join(', ') });
   const url = s.target + (req.query.path || '/');
@@ -91,7 +91,7 @@ app.get('/api/debug', async (req, res) => {
   } catch (e) { res.status(502).json({ requested: url, error: e.message }); }
 });
 
-app.get('/api/config', (req, res) => res.json(cfg.urls));
+app.get('/portal/config', (req, res) => res.json(cfg.urls));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views', 'index.html')));
 
 module.exports = app;
