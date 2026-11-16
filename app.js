@@ -72,6 +72,25 @@ app.get('/api/stock', (req, res) => {
   res.json({ found: items.length > 0, items });
 });
 
+// ---- Diagnostics: /api/debug?site=ps&path=/ shows what the other site returns to your server ----
+app.get('/api/debug', async (req, res) => {
+  const s = cfg.sites[req.query.site];
+  if (!s) return res.status(400).json({ error: 'site must be one of: ' + Object.keys(cfg.sites).join(', ') });
+  const url = s.target + (req.query.path || '/');
+  try {
+    const r = await fetch(url, { redirect: 'manual', headers: { 'user-agent': 'Mozilla/5.0', 'accept': 'text/html' } });
+    const text = await r.text();
+    res.json({
+      requested: url, status: r.status,
+      location: r.headers.get('location'),
+      server: r.headers.get('server'),
+      contentType: r.headers.get('content-type'),
+      blockedByBotCheck: /cloudflare|captcha|just a moment|access denied/i.test(text),
+      bodyStart: text.slice(0, 400)
+    });
+  } catch (e) { res.status(502).json({ requested: url, error: e.message }); }
+});
+
 app.get('/api/config', (req, res) => res.json(cfg.urls));
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'views', 'index.html')));
 
